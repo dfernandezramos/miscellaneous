@@ -1,6 +1,7 @@
 import os
 import time
 import re
+import requests
 from slackclient import SlackClient
 
 # instantiate Slack client
@@ -8,10 +9,14 @@ slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 # radbbot's user ID in Slack: value is assigned after the bot starts up
 radbbot_id = None
 
-#constants
+# constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "blanco"
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
+
+# commands
+BLANCO_COMMAND = "blanco"
+RADB_STATUS_COMMAND = "status"
+HELP_COMMAND = "help"
 
 def parse_bot_commands(slack_events):
     """
@@ -40,20 +45,47 @@ def handle_command(command, channel):
         Executes bot command if the command is known
     """
     # default response is help text for the user
-    default_response = "Not sure what you mean. Try *{}*.".format(EXAMPLE_COMMAND)
-    
-    # finds and executes the given command, filling in response
-    response = None
-    
-    if command.startswith (EXAMPLE_COMMAND):
-        response = "I'm a fucking nigga!!!"
+    response = ["Not sure what you mean. Try *{}*.".format(HELP_COMMAND)]
+
+    if command.startswith (HELP_COMMAND):
+        del response[:]
+        response.append("These are the commands you can ask me to respond:\n*{}, {}*".format(BLANCO_COMMAND, RADB_STATUS_COMMAND))
+
+    if command.startswith (BLANCO_COMMAND):
+        del response[:]
+        response.append("I'm a fucking nigga!!!")
+
+    if command.startswith (RADB_STATUS_COMMAND):
+        del response[:]
+        api_resp = requests.get(url="https://redis-test-223116.appspot.com/health-check")
+        data = api_resp.json()
+
+        temp = "Here you are the API status report: \n\n" +\
+                "Riot webpage:  *{}* \n".format(":white_check_mark:" if data["riotWebpageIsUp"] else ":warning:") +\
+                "ChampionGG Status:  *{}* \n".format(":white_check_mark:" if data["championGGIsUp"] else ":warning:") +\
+                "Google datastore:  *{}* \n".format(":white_check_mark:" if data["datastoreIsUp"] else ":warning:")\
+
+        if any(data["afectedRiotEndpoints"]):
+            temp = temp +"\nHere is the list of affected Riot endpoints: \n\n"
+            for keyEP, valueEP in data["afectedRiotEndpoints"].iteritems():
+                temp = temp + ":warning: *{}* in: ".format(keyEP)
+                for keyR, valueR in valueEP.iteritems():
+                    temp = temp + "{} ".format(keyR)
+                temp = temp + "\n"
+            temp = temp +"\n The rest of the endpoints are OK :white_check_mark:.\n"
+        else:
+            temp = temp + "All Riot endpoints: :white_check_mark:"
+
+        response.append(temp)
     
     # sends the response back to the channel
-    slack_client.api_call(
-        "chat.postMessage",
-        channel=channel,
-        text=response or default_response
-    )
+    for message in response:
+        slack_client.api_call(
+            "chat.postMessage",
+            channel=channel,
+            text=message
+        )
+        time.sleep(RTM_READ_DELAY)
 
 if __name__ == "__main__":
     if slack_client.rtm_connect(with_team_state=False):
