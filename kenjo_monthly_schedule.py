@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import getpass
 import sys
 import os
 import requests
@@ -115,12 +116,18 @@ class Scheduler(KenjoClient):
 
 
 def main():
-    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "kenjo.conf")
-    with open(config_file) as file:
-        creds = file.read().splitlines()
+    try:
+        config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), "kenjo.conf")
+        with open(config_file) as file:
+            creds = file.read().splitlines()
+            username = creds[0]
+            password = creds[1]
+    except:
+        username = input("Enter you e-mail: ")
+        password = getpass.getpass(prompt='Enter your password: ', stream=None)
 
     scheduler = Scheduler()
-    scheduler.login(creds[0], creds[1])
+    scheduler.login(username, password)
     # use with firstweekday = 0 (Monday)
     c = calendar.Calendar(firstweekday = 0)
     
