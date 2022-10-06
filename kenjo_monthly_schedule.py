@@ -16,6 +16,8 @@ class KenjoClient:
     def __init__(self):
         self._token = None
         self._user_id = None
+        self._time_off_requests = None
+        self._holidays = None
 
     def __del__(self):
         try:
@@ -63,7 +65,39 @@ class KenjoClient:
             },
             "_deleted": False
         })
-        return bool(len(data) == 0)
+
+        if len(data) != 0:
+            return False
+
+        for time_off_request in self._time_off_requests:
+            if len(time_off_request['_approvedBy']) == 0:
+                continue
+
+            fromString = time_off_request['_from'].split("T")[0]
+            fromDate = date.fromisoformat(fromString)
+            toString = time_off_request['_to'].split("T")[0]
+            toDate = date.fromisoformat(toString)
+
+            if fromDate <= day <= toDate:
+                return False
+
+        for template in self._holidays:
+            if template['templateKey'] != "spain-barcelona":
+                continue;
+
+            for holiday in template['holidays']:
+                if day == date.fromisoformat(holiday['holidayDate']):
+                    return False
+            break
+
+        return True
+
+    def get_days_off(self):
+        if self._token is None:
+            raise Exception("not logged in")
+
+        self._holidays = self._send_request("/calendar-template-db/templates")
+        self._time_off_requests = self._send_request("/user-time-off-request/find", {"_userId": self._user_id})
 
     def add_schedule(self, day, start_time, end_time, break_time):
         if self._token is None:
@@ -90,11 +124,11 @@ class Scheduler(KenjoClient):
     _BREAK_TIME_DEVIATION_IN_MINUTES = 20
 
     def fulfill_schedule(self, day):
-        if not self.is_expecting_schedule(day):
-            return
-
         week_day = day.weekday()
         if week_day >= 5:
+            return
+
+        if not self.is_expecting_schedule(day):
             return
 
         if week_day == 4:
@@ -130,6 +164,9 @@ def main():
     scheduler.login(username, password)
     # use with firstweekday = 0 (Monday)
     c = calendar.Calendar(firstweekday = 0)
+
+    # get time off requests from the logged user
+    scheduler.get_days_off()
     
     # iterating with itermonthdates
     for day in c.itermonthdates(date.today().year, date.today().month):
