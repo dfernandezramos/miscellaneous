@@ -70,12 +70,18 @@ class KenjoClient:
             return False
 
         for time_off_request in self._time_off_requests:
-            if len(time_off_request['_approvedBy']) == 0:
-                continue
+            request = time_off_request.get('request')
 
-            fromString = time_off_request['_from'].split("T")[0]
+            if request is None or (
+                request['status'] != "Approved" and
+                request['status'] != "Submitted" and
+                request['status'] != "Processed"
+            ):
+                continue;
+
+            fromString = request['from'].split("T")[0]
             fromDate = date.fromisoformat(fromString)
-            toString = time_off_request['_to'].split("T")[0]
+            toString = request['to'].split("T")[0]
             toDate = date.fromisoformat(toString)
 
             if fromDate <= day <= toDate:
@@ -97,7 +103,7 @@ class KenjoClient:
             raise Exception("not logged in")
 
         self._holidays = self._send_request("/calendar-template-db/templates")
-        self._time_off_requests = self._send_request("/user-time-off-request/find", {"_userId": self._user_id})
+        self._time_off_requests = self._send_request("/controller/time-off-user-history/{}".format(self._user_id))
 
     def add_schedule(self, day, start_time, end_time, break_time):
         if self._token is None:
