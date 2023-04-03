@@ -69,7 +69,7 @@ class KenjoClient:
         if len(data) != 0:
             return False
 
-        for time_off_request in self._time_off_requests:
+        for time_off_request in self._time_off_requests['records']:
             request = time_off_request.get('request')
 
             if request is None or (
@@ -103,7 +103,7 @@ class KenjoClient:
             raise Exception("not logged in")
 
         self._holidays = self._send_request("/calendar-template-db/templates")
-        self._time_off_requests = self._send_request("/controller/time-off-user-history/{}".format(self._user_id))
+        self._time_off_requests = self._send_request("/controller/time-off-user-history", {"userId": self._user_id})
 
     def add_schedule(self, day, start_time, end_time, break_time):
         if self._token is None:
